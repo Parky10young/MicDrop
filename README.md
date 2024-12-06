@@ -132,7 +132,11 @@ localhost:5000/
 ---
 
 ## Reference
+1. WebRTC
+   '''https://github.com/supersjgk/LiveStream-WebRTC-Flask-OpenCV'''
+2. Polling Feature
 '''https://github.com/danidee10/Votr'''
+3. Visual Organization
 '''https://www.instructables.com/Web-Designing-Basics-HTML-and-CSS/ '''
 
 
