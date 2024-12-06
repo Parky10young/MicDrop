@@ -123,7 +123,20 @@ localhost:5000/
 
 ---
 
+## Upgrade Plans
+- Display timer control for the server to set time for the poll easily, without needing to modify number in code
+- Reduce voice stream delay
+- Add other features such as developer profile
+- Enable seperate release buttons for each poll
+
+---  
+
 ## Acknowlegement
 https://github.com/danidee10/Votr
+
+---
+
+## Reference
+'''https://www.instructables.com/Web-Designing-Basics-HTML-and-CSS/ '''
 
 
