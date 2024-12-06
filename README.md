@@ -103,9 +103,9 @@ localhost:5000/
 ---
 
 ## Network User's Features Instructions (Audience)
-Scan QR code generated on the shared screen from server
-The url would look something like: xxx-xxx-xxxx-xxx.ngrok-free.app/
-This is uses "HTTPS://" instead of "HTTP://" so that network users can 
+- Scan QR code generated on the shared screen from server
+- The url would look something like: xxx-xxx-xxxx-xxx.ngrok-free.app/
+- This is uses "HTTPS://" instead of "HTTP://" so that network users can 
 
 ### Send Message
 - Direct to the page by clicking "Talk with us" button in the Menu
