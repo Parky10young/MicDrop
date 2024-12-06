@@ -37,6 +37,9 @@ The Mic Drop project is structured into modular components:
 3. **WebRTC**:
    - Real-time peer-to-peer audio communication with ICE candidate handling.
 
+4. **Database**:
+   - Uses SQLAlchemy with SQLite for managing poll data and relationships between questions and options.
+
 ---
 
 ## Installation
