@@ -78,6 +78,7 @@ The Mic Drop project is structured into modular components:
 ---
 
 ## Local User's Features Instructions
+
 ### Handle Message Container
 - Direct to "Talk with us" button in the Menu
 - Then network users can connect to this page.
