@@ -129,14 +129,10 @@ localhost:5000/
 - Add other features such as developer profile
 - Enable seperate release buttons for each poll
 
----  
-
-## Acknowlegement
-https://github.com/danidee10/Votr
-
 ---
 
 ## Reference
+'''https://github.com/danidee10/Votr'''
 '''https://www.instructables.com/Web-Designing-Basics-HTML-and-CSS/ '''
 
 
