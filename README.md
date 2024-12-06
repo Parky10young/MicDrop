@@ -13,6 +13,7 @@ The **Mic Drop** project is an interactive web application that enables dynamic 
 - **Network Users**:
   - Join discussions through text or audio using mobile-friendly interfaces.
   - Real-time updates via Socket.IO ensure synchronized communication.
+  - 
 
 ### 2. Polling System
 - **Poll Creation**: Local users create dynamic polls with multiple questions and options.
@@ -76,7 +77,23 @@ The Mic Drop project is structured into modular components:
 
 ---
 
-## Acknowlegement
+## Local User's Features Instructions
+### Handle Message Container
+- Direct to "Talk with us" button in the Menu
+- Then network users can connect to this page.
+- To start the voice communication, click "call" button
+- To end the call, click "hang up" button
+- To delete que element, click "delete" buttons for both text and voice messages.
+This is for the case when you are done discussing the message(text or voice)
 
-   sfada
+---
+
+## Network User's Features Instructions
+1. 
+
+---
+
+## Acknowlegement
+https://github.com/danidee10/Votr
+
 
