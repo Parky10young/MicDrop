@@ -65,15 +65,14 @@ The Mic Drop project is structured into modular components:
    ```bash
    flask db upgrade
 
-5. Run flask app
+4. Set up NGROK free https url (for Audience)
    ```cmd
    ngrok http 5000
 
+5. Run application
    ```bash
    python3 app.py
-or
-    ```bash
-   flask run
+
 
 
    
