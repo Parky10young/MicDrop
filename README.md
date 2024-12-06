@@ -73,7 +73,7 @@ The Mic Drop project is structured into modular components:
    python3 app.py
 or
     ```bash
-    flask run
+   flask run
 
 
    
