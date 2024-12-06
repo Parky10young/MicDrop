@@ -50,6 +50,7 @@ The Mic Drop project is structured into modular components:
 - Node.js and npm (for frontend dependencies)
 - Flask and Socket.IO packages
 - NGROK installation for HTTPS usage instead of HTTP (ensuring security when using phone interfaces)
+- Sign up at ngrok
 
 ### Steps for Running the App
 1. Clone the repository:
