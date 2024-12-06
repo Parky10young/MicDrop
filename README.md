@@ -72,7 +72,7 @@ The Mic Drop project is structured into modular components:
 5. Run application
    ```bash
    python3 app.py
-
+  ```
 
 
    
