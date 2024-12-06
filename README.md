@@ -53,12 +53,11 @@ The Mic Drop project is structured into modular components:
    cd mic-drop
    
 2. Install dependencies:
-'''bash
-Copy code
-- pip install -r requirements.txt
-- npm install
-- flask db upgrade
-- flask run
+```bash
+pip install -r requirements.txt
+npm install
+flask db upgrade
+flask run
 
 
 
