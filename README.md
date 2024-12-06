@@ -55,3 +55,22 @@ The Mic Drop project is structured into modular components:
    ```bash
    git clone https://github.com/Parky10young/MicDrop.git
    cd MicDrop
+
+2. Install dependencies:
+   ```bash
+    pip install -r requirements.txt
+    npm install
+
+3. Set up database:
+   ```bash
+   flask db upgrade
+
+5. Run flask app
+   ```cmd
+   ngrok http 5000
+   python3 app.py
+or
+    flask run
+
+
+   
