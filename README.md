@@ -68,8 +68,11 @@ The Mic Drop project is structured into modular components:
 5. Run flask app
    ```cmd
    ngrok http 5000
+
+   ```bash
    python3 app.py
 or
+    ```bash
     flask run
 
 
