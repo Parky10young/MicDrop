@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block page_content %}
+<div class="container text-center mt-5">
+    <section class="welcome-section">
+        <article class="welcome-message">
+            <h1>Welcome to Mic Drop!</h1>
+            <p style="font-size: 18px; font-family: fantasy;">Use your phone as a mic</p>
+            <p style="font-size: 16px;">Imagine that you are in the middle of an enormous audience, 
+                perhaps in a big auditorium where the open talk is being held.
+                It is finally a time that you could express your opinion.
+                You are waiting for a staff to walk up 
+                and people beside you then are passing around the microphone until it reaches to you.</p>
+            <p style="font-size: 16px;">    
+                Mic Drop is an online flask application development that enables phone microphone function,
+            that directly connects to the server's speaker along with other features.</p>
+        </article>
+        
+        
+        <!-- QR Code Display -->
+        <div style="text-align: center;">
+            <br><br>
+            <h3 style="font-size: 2.5vw;">Scan this QR code & talk with us!:</h3>
+            <img src="{{ qr_code_url }}" alt="QR Code for the Website!" style="width: 40%; max-width: 300px; height: auto;" />
+        </div>
+
+    </section>
+</div>
+{% endblock %}

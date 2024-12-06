@@ -1,0 +1,57 @@
+<!-- local_create_poll.html -->
+{% extends "base.html" %}
+
+{% block title %}Create or Edit Poll{% endblock %}
+
+{% block page_content %}
+<h2 style="font-size:15px; color:gray;">
+    **This page shows polls that are pre-created by the server. 
+    When polls are created and all the polls are released, the audience can look into how polls look like, but not yet able to vote.
+    After the server sets timer, this page will automatically render another page, which shows the results of the polls.**
+</h2>
+<br>
+
+<h1>Create a New Poll</h1>
+    <form id="pollForm" method="POST" onsubmit="event.preventDefault();">
+        <div id="questionsContainer">
+            <div class="form-group" id="questionContainer1">
+                <label>Poll Question 1:</label>
+                <input type="text" class="form-control" name="questions[]" placeholder="Enter question here" required>
+                <div class="mt-2" id="optionsContainer1">
+                    <label>Options:</label>
+                    <div class="d-flex align-items-center mb-2">
+                        <input type="text" class="form-control me-2" name="options[0][]" placeholder="Option 1" required>
+                        <button type="button" class="btn btn-light btn-sm" onclick="deleteOption(this)">Delete</button>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <input type="text" class="form-control me-2" name="options[0][]" placeholder="Option 2" required>
+                        <button type="button" class="btn btn-light btn-sm" onclick="deleteOption(this)">Delete</button>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary mt-2" onclick="addOption('optionsContainer1')">Add Option</button>
+                <button type="button" class="btn btn-secondary mt-3" onclick="addQuestion()">Add Question</button>
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary mt-3" onclick="submitPoll()">Create Poll</button>
+    </form>
+
+<hr>
+
+    <h2>Existing Polls</h2>
+    <div id="existingPollsContainer" class="mt-4">
+        <p>Loading polls...</p>
+    </div>
+    <button id="releasePollButton" class="btn btn-sm mt-3">Release Poll</button>
+    <button id="startTimerButton" class="btn btn-sm mt-3">Start Timer</button>
+
+
+
+
+<script src="/static/js/local_create_poll.js"></script>
+
+<script>
+        const protocol = location.protocol === 'https:' ? 'https://' : 'http://';
+        const socket = io.connect(protocol + document.domain + ':' + location.port);
+        
+</script>
+{% endblock %}

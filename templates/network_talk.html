@@ -1,0 +1,515 @@
+{% extends "base.html" %}
+
+{% block title %}Network User - Text & Audio Stream{% endblock %}
+
+{% block page_content %}
+<h1 style="position: absolute; top: 0; right: 0; margin: 10px; font-size: 24px;">Network User View</h1>
+<link rel="icon" href="https://example.com/favicon.ico">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+<h2 style="font-size:15px; color:gray;">** In this page, the audience can either send direct text message or send a voice call registration! 
+    This communication is possible by using IO sockets. 
+    For the communicative functions, socket.emit(speaking keyword) & socket.on(listening to keyword) are used.**</h2>
+<br>
+
+<!-- Input fields for name and major/job -->
+ 
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+    <label for="nameInput" style="width: 100px;">Name:</label>
+    <input type="text" id="nameInput" placeholder="Enter your name" oninput="updateFormState()" style="flex: 1;">
+</div>
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+    <label for="majorInput" style="width: 100px;">Background:</label>
+    <input type="text" id="majorInput" placeholder="Enter your major or job" oninput="updateFormState()" style="flex: 1;">
+</div>
+
+<!-- Message input area -->
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+    <button style="
+        background-color: #646464; 
+        color: white; 
+        border: none; 
+        border-radius: 50%; 
+        width: 40px; 
+        height: 40px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    " onclick="alert('Comment button clicked!')">
+        <i class="fas fa-comment-alt" style="font-size: 20px;"></i>
+    </button>
+    <h2 style="margin-left: 10px;">Option 1. Share Your Words!</h2>
+</div>
+<textarea id="messageInput" style="border: 1px solid #7c4e09; height: 50px; width: 100%; resize: none;" placeholder="Type your message" oninput="updateFormState()"></textarea>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <div id="wordCountDisplay" style="font-size: 14px; color: gray;">20 words maximum: 0/20</div>
+    <button id="sendButton" style="margin-left: 10px;" onclick="sendMessage()" disabled>Send</button>
+</div>
+
+
+<button id="registerButton" style="display: none; margin-top: 10px; width: 100%;" disabled>Register to Send Again</button>
+
+<!-- Audio Call Section -->
+<div style="display: flex; align-items: center; margin-bottom: 10px;">
+    <button style="
+        background-color: #646464; 
+        color: white; 
+        border: none; 
+        border-radius: 50%; 
+        width: 40px; 
+        height: 40px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    " onclick="alert('Comment button clicked!')">
+        <i class="fas fa-microphone-alt" style="font-size: 20px;"></i>
+    </button>
+    <h2 style="margin-left: 10px;">Option 2. Share Your Voice!</h2>
+</div>
+
+<div style="display: flex; width: 100%;">
+    <button id="requestButton" class="btn btn-light" style="width: 33%;" onclick="requestToConnect()">Request</button>
+    <button id="callButton" class="btn btn-secondary" style="width: 33%;" disabled>Talk</button>
+    <button id="hangupButton" class="btn btn-dark" style="width: 33%;" disabled>Hang Up</button>
+</div>
+
+<!-- Message display container -->
+<br>
+<div id="messageContainer" style="border: 1px solid black; height: 50px; overflow-y: scroll; width: 100%;"></div>
+
+<div id="alertContainer" style="display: none; position: fixed; top: 20px; right: 20px; padding: 10px; background-color: #ffcc00; color: black; border-radius: 5px; font-size: 16px; z-index: 1000;">
+    A call has been started from the local user.
+</div>
+
+<!-- Audio Visualization Canvas -->
+<div>
+    <!-- <h2>Audio Level Visualization</h2> -->
+    <canvas id="audioVisualizer" width="300" height="100" style="display:none"></canvas>
+</div>
+
+<!-- Ensure Socket.IO client library is loaded -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+
+<script>
+    // Socket connection setup
+    const socket = io.connect('{{ NGROK_URL }}');
+    const wordLimit = 20;
+    let canSendMessage = true;
+    let messageSent = false;
+    let localStream;
+    let pc;
+    const callDuration = 60000; // 60 seconds for testing
+    const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    let num_talk_reg=0;
+    let timerDuration = 5000; // Timer duration in milliseconds (30 seconds)
+    let timerInterval; // To store the timer interval ID
+
+    // Disable buttons and start the timer
+    function startTimer() {
+        registerButton.disabled = true; // Disable the send button
+        document.getElementById('requestButton').disabled = true; // Disable the request button
+
+        let remainingTime = timerDuration / 1000; // Convert milliseconds to seconds
+        alert(`Please wait for ${remainingTime} seconds.`);
+
+        // Timer countdown
+        timerInterval = setInterval(() => {
+            remainingTime--;
+            if (remainingTime <= 0) {
+                clearInterval(timerInterval); // Stop the timer
+                registerButton.disabled = false; // Enable the send button
+                document.getElementById('requestButton').disabled = false; // Enable the request button
+                num_talk_reg = -1;
+                alert('You can now send a message or make a request again.'); // Show alert
+            }
+        }, 1000); // Update every second
+    }
+
+
+
+
+    const sendButton = document.getElementById('sendButton');
+    const registerButton = document.getElementById('registerButton');
+    const callButton = document.getElementById('callButton');
+    const hangupButton = document.getElementById('hangupButton');
+
+    // Audio Visualization Setup
+    let audioContext;
+    let analyser;
+    let dataArray;
+    let animationId;
+    const canvas = document.getElementById('audioVisualizer');
+    const canvasCtx = canvas.getContext('2d');
+
+    // Ensure pc is created before setting event handlers
+    if (!pc) {
+        pc = new RTCPeerConnection(configuration);
+    }
+
+    // Set the onicecandidate handler after initializing pc
+    pc.onicecandidate = ({ candidate }) => {
+        if (candidate) {
+            socket.emit('ice-candidate', candidate);
+        }
+    };
+
+
+    // Initialize the candidate queue
+    let candidateQueue = [];
+    let remoteDescriptionSet = false;
+
+
+
+    function setupAudioVisualization(stream) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        analyser.fftSize = 256;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        drawAudioLevel();
+    }
+
+    function drawAudioLevel() {
+        animationId = requestAnimationFrame(drawAudioLevel);
+        analyser.getByteFrequencyData(dataArray);
+        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / dataArray.length) * 2.5;
+        let x = 0;
+
+        dataArray.forEach(barHeight => {
+            barHeight /= 2;
+            canvasCtx.fillStyle = `rgb(${barHeight + 100}, 50, 150)`;
+            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+            x += barWidth + 1;
+        });
+    }
+
+    function stopAudioVisualization() {
+        cancelAnimationFrame(animationId);
+        audioContext && audioContext.close();
+    }
+
+    // Handle "Request" button click
+    function requestToConnect() {
+        // sendButton.disabled=true;
+        // registerButton.disabled=true;
+        if (num_talk_reg >= 1) {
+            alert('You have reached the maximum number of talk registrations.');
+            startTimer();
+            return;
+        }
+        const name = document.getElementById('nameInput').value.trim();
+        const major = document.getElementById('majorInput').value.trim();
+        if (!name || !major) return alert("Please fill in both name and background.");
+        socket.emit('request_to_connect', { name, major });
+        num_talk_reg += 1;
+    }
+
+    socket.on('request_to_connect_ack', function(data) {
+        const messageContainer = document.getElementById('messageContainer');
+
+        // Create a new div for the message
+        const newMessage = document.createElement('div');
+
+        newMessage.classList.add('message-block');
+        newMessage.setAttribute('data-id', data.id);
+
+        newMessage.style.display = 'flex';
+        newMessage.style.justifyContent = 'space-between';
+        newMessage.style.alignItems = 'center';
+        newMessage.style.marginBottom = '10px';
+
+        // Create the message content with speaker ID
+        const messageContent = document.createElement('span');
+        // messageContent.innerHTML = `<strong>${data.speaker_id}</strong> (${data.name}) has requested to connect as a ${data.major}.`;
+        messageContent.innerHTML = `You have requested to connect as <strong>${data.speaker_id}</strong> (${data.name}/${data.major}).`;
+
+        // Create the Delete button
+        const deleteButton = document.createElement('button');
+        deleteButton.innerHTML = 'Delete';
+        deleteButton.className = 'btn btn-light';
+
+        // Add event listener to delete the message and emit a delete request to the server
+        deleteButton.onclick = function() {
+            newMessage.remove(); // Remove the message from the DOM when clicked
+            socket.emit('delete_speaking_request', { id: data.id }); // Emit delete request with message ID
+        };
+        
+        // delete speaking request
+        socket.on('delete_message', function(data) {
+            const messageElement = document.querySelector(`[data-id='${data.id}']`);
+            if (messageElement) {
+                messageElement.remove();
+            }
+        });
+
+        function deleteMessage(id) {
+            socket.emit('delete_message', { id : id });
+        }
+
+
+        // Append the message content and delete button to the new message div
+        newMessage.appendChild(messageContent);
+        newMessage.appendChild(deleteButton);
+
+        // Append the new message to the message container
+        messageContainer.appendChild(newMessage);
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+    });
+
+
+    // Setup Call Button
+    callButton.onclick = async function() {
+        hangupButton.disabled=false;
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            pc = new RTCPeerConnection(configuration);
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+            pc.onicecandidate = ({ candidate }) => {
+                if (candidate) socket.emit('ice-candidate', candidate);
+            };
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            
+            socket.emit('offer', { offer });
+        } catch (err) {
+            console.error('Error accessing audio:', err);
+        }
+    };
+
+
+
+
+    hangupButton.onclick = function() {
+        stopAudioVisualization();
+        pc && pc.close();
+        localStream && localStream.getTracks().forEach(track => track.stop());
+        hangupButton.disabled = true;
+        callButton.disabled = true;
+        socket.emit('hangup', { id: 'network_user' });
+    };
+
+    socket.on('call_enabled', async () => callButton.disabled = false);
+
+    socket.on('hangup', function(data) {
+        console.log("Received 'hangup' event:", data);
+        stopAudioVisualization();  // Stop visualization on hangup
+
+        if (pc) {
+            pc.close();
+            pc = null;
+        }
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+
+        callButton.disabled = false;
+        hangupButton.disabled = true;
+        
+        alert(data.message || "The call has ended.");
+    });
+
+    // Listen for delete_speaking_request event to remove the specific message
+    socket.on('delete_speaking_request', function(data) {
+        const messageElement = document.querySelector(`[data-id='${data.id}']`);
+        if (messageElement) {
+            messageElement.remove();
+        }
+    });
+
+
+
+
+    //--------------Message--------------------------------------------
+
+    // Messaging and Word Count Management
+    function updateFormState() {
+        const name = document.getElementById('nameInput').value.trim();
+        const major = document.getElementById('majorInput').value.trim();
+        const message = document.getElementById('messageInput').value.trim();
+        const wordCount = message.split(/\s+/).filter(word => word.length > 0).length;
+        document.getElementById('wordCountDisplay').textContent = `20 words maximum: ${wordCount}/20`;
+        sendButton.disabled = !(name && major && wordCount > 0 && wordCount <= wordLimit && canSendMessage);
+    }
+
+    function sendMessage() {
+        // document.getElementById('requestButton').disabled = true; // Disable the request button        
+        if (num_talk_reg >= 1) {
+            alert('You have reached the maximum number of talk registrations.');
+            startTimer();
+            return;
+        }
+        const name = document.getElementById('nameInput').value.trim();
+        const major = document.getElementById('majorInput').value.trim();
+        const message = document.getElementById('messageInput').value.trim();
+
+        if (!name || !major || !message) return alert("Please fill in all fields.");
+        const wordCount = message.split(/\s+/).filter(word => word.length > 0).length;
+
+        if (wordCount <= wordLimit && wordCount > 0 && canSendMessage) {
+            if (num_talk_reg >= 1) {
+                return alert('You have reached the maximum number of talk registrations.');
+            }
+            socket.emit('send_message', { name, major, message });
+            document.getElementById('messageInput').value = '';
+            updateFormState();
+            canSendMessage = false;
+            registerButton.style.display = 'block';
+            registerButton.disabled=false;
+            num_talk_reg += 1;
+        }
+
+    }
+
+    let timer = 5000; // Timer duration in milliseconds
+    registerButton.onclick = function () {
+        // Disable the button immediately to prevent multiple clicks
+        registerButton.disabled = true;
+
+        // Show an alert to notify the user with the timer value in seconds
+        alert(`Registered to send another message: Please wait for ${timer / 1000} seconds.`);
+
+        // Re-enable message sending after the specified timer duration
+        setTimeout(() => {
+            canSendMessage = true;
+            sendButton.disabled = false; // Enable the "Send" button again
+            updateFormState(); // Update the form state to reflect changes
+
+            // Notify the user that they can send messages again
+            alert('You can now send another message.');
+        }, timer);
+    };
+
+
+
+    socket.on('broadcast_message', function(data) {
+        const messageContainer = document.getElementById('messageContainer');
+        
+        if (!document.querySelector(`[data-id='${data.id}']`)) {
+            const newMessage = document.createElement('div');
+            newMessage.setAttribute('data-id', data.id);
+            
+            // Add a delete button for the sender
+            newMessage.innerHTML = `
+                <strong>${data.name}</strong> (${data.major}): ${data.message}
+                <button onclick="deleteMessage(${data.id})">Delete</button>
+            `;
+            
+            messageContainer.appendChild(newMessage);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+    });
+
+    function deleteMessage(id) {
+        socket.emit('delete_message', { id : id });
+    }
+
+    socket.on('delete_message', function(data) {
+        const messageElement = document.querySelector(`[data-id='${data.id}']`);
+        if (messageElement) {
+            messageElement.remove();
+        }
+    });
+
+
+
+
+
+
+
+    socket.on('call_started', data => {
+        const alertContainer = document.getElementById('alertContainer');
+        alertContainer.style.display = 'block';
+        alertContainer.textContent = data.message;
+        setTimeout(() => alertContainer.style.display = 'none', 5000);
+        callButton.disabled = false;
+    });
+
+
+
+    // Handle starting the call (network user side)
+    async function startCall() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            pc = new RTCPeerConnection(configuration);
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            
+            pc.ontrack = (event) => {
+                const remoteStream = event.streams[0];
+                socket.emit('receive_audio_stream', remoteStream);  // Emit the audio stream to the local user
+            };
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('offer', { offer });
+
+        } catch (err) {
+            console.error('Error during call setup:', err);
+        }
+    }
+    
+
+    // Listen for incoming answer
+    socket.on('answer', async (data) => {
+        try {
+            if (pc.signalingState === 'have-local-offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else {
+                console.warn('Skipping setRemoteDescription, connection not in have-local-offer state');
+            }
+        } catch (error) {
+            console.error('Error handling received answer:', error);
+        }
+    });
+
+
+    // ICE candidate handling
+    socket.on('ice-candidate', (data) => {
+        if (data.candidate && data.sdpMid !== null && data.sdpMLineIndex !== null) {
+            // Ensure usernameFragment is non-null, if needed for compatibility
+            const candidateInit = {
+                candidate: data.candidate,
+                sdpMid: data.sdpMid,
+                sdpMLineIndex: data.sdpMLineIndex,
+                usernameFragment: data.usernameFragment || 'default-ufrag'  // Use a default if null
+            };
+
+            try {
+                const iceCandidate = new RTCIceCandidate(candidateInit);
+                pc.addIceCandidate(iceCandidate);
+            } catch (error) {
+                console.error('Error adding received ICE candidate:', error);
+            }
+        } else {
+            console.warn('Received invalid ICE candidate data:', data);
+        }
+    });
+
+
+
+    pc.onicecandidate = ({ candidate }) => {
+        if (candidate) {
+            // Check if the candidate has the required fields
+            if (candidate.candidate && candidate.sdpMid !== null && candidate.sdpMLineIndex !== null) {
+                socket.emit('ice-candidate', { candidate });
+            } else {
+                console.warn('Invalid ICE candidate, skipping:', candidate);
+            }
+        }
+    };
+
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

@@ -1,0 +1,568 @@
+{% extends "base.html" %}
+
+{% block title %}Server's Text & Audio{% endblock %}
+
+{% block page_content %}
+<h2 style="font-size:15px; color:gray;">** In this page, text messages and call registration gets displayed in a que by listening to the keywords that the audience's page is sending via socket.emit. 
+    The server handles the que as the elements are reviewed.**</h2>
+
+<div class="container text-center mt-5">
+    <h1>Server's View - Messages and Audio Streams</h1>
+
+    <!-- Display text and audio streams in one queue -->
+    <div id="messageContainer" style="border: 1px solid rgb(216, 209, 186); height: 250px; overflow-y: scroll; width: 100%;">
+        <!-- Messages and streams will be dynamically appended here -->
+    </div>
+
+    <!-- QR Code Display -->
+    <div style="position: absolute; top: 10px; right: 10px;">
+        <img src="{{ qr_code_url }}" alt="QR Code for Website" style="width: 120px; height: 120px;" />
+    </div>
+
+    <!-- Audio Call Section -->
+    <div class="mt-4">
+        <button id="deleteButton" class="btn btn-danger" style="display:none; width: 25%; height: 50px; font-size: 16px;" disabled>Delete</button>
+        <button id="callButton" class="btn btn-primary" style="display:none; width: 25%; height: 50px; font-size: 16px;" disabled>Call</button>
+        <button id="hangupButton" class="btn btn-danger" style="display:none; width: 25%; height: 50px; font-size: 16px;" disabled>Hang Up</button>
+    </div>
+
+
+
+    <!-- Audio Visualization Canvas -->
+    <div class="row mt-4" style="display: flex; justify-content: space-between; align-items: center;">
+        <!-- Audio Visualization -->
+        <div id="audioVisualizerContainer" style="flex: 1; text-align: left;">
+            <h2 style="font-size: 20px; color: #556279; text-align: center;">Audio Level</h2>
+            <canvas id="audioVisualizer" width="300" height="100"></canvas>
+        </div>
+    
+        <!-- Volume Control -->
+        <div id="volumeControlContainer" style="flex: 1; text-align: right;">
+            <h2 style="font-size: 15px; color: #556279; text-align: right;">Volume</h2>
+            <input type="range" id="volumeControl" min="0" max="1" step="0.01" value="1">
+        </div>
+    </div>
+
+</div>
+    
+
+<!-- Play Audio Button -->
+<!-- <button id="playAudioButton">Play Audio</button> -->
+
+
+<!-- Volume Control Slider -->
+<style>
+    .row {
+        display: flex; /* Align items side-by-side */
+        justify-content: space-between; /* Push items to opposite sides */
+        align-items: center; /* Vertically center items */
+        width: 100%; /* Ensure full width */
+    }
+
+    #audioVisualizer {
+        border: 1px solid #cccccc; /* Optional: Add border for the visualization */
+    }
+</style>
+<style>
+    #volumeControl {
+        width: 100px; /* Adjust the width of the slider */
+        appearance: none; /* Remove default browser styling for more control */
+        background: linear-gradient(90deg, hwb(187 83% 0%), #557579); /* Add gradient styling */
+        height: 5px; /* Thickness of the track */
+        border-radius: 5px; /* Rounded corners */
+        outline: none;
+        margin-top: 10px;
+        transition: background 0.3s ease;
+    }
+
+    #volumeControl::-webkit-slider-thumb {
+        appearance: none; /* Remove default browser styling */
+        width: 20px; /* Thumb size */
+        height: 20px; /* Thumb size */
+        border-radius: 50%; /* Make the thumb circular */
+        background: #ffffff; /* Thumb color */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Add shadow for depth */
+        cursor: pointer; /* Change cursor to pointer */
+        transition: background 0.3s ease, transform 0.2s ease;
+    }
+
+    #volumeControl::-webkit-slider-thumb:hover {
+        background: #e0e0e0; /* Lighten the thumb on hover */
+        transform: scale(1.1); /* Slightly enlarge the thumb */
+    }
+
+    #volumeControl::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+    }
+
+    #volumeControl::-moz-range-progress {
+        background: linear-gradient(90deg, #6a11cb, #2575fc); /* Progress fill */
+    }
+</style>
+
+<!-- <label for="volumeControl">Volume:</label>
+<input type="range" id="volumeControl" min="0" max="1" step="0.01" value="1">
+ -->
+
+
+
+
+
+
+
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+<script>
+    const protocol = location.protocol === 'https:' ? 'https://' : 'http://';
+    const socket = io.connect(protocol + document.domain + ':' + location.port);
+    
+    let localStream;
+    let pc;
+    const configuration = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] };
+    const callButton = document.getElementById('callButton');
+    const hangupButton = document.getElementById('hangupButton');
+
+    // Audio Visualization Setup
+    let audioContext;
+    let analyser;
+    let dataArray;
+    let animationId;
+    const canvas = document.getElementById('audioVisualizer');
+    const canvasCtx = canvas.getContext('2d');
+
+    // HTML element for audio playback of remote stream
+    const remoteAudio = new Audio();
+    remoteAudio.autoplay = true;
+    remoteAudio.controls = false;  // Optional: Show audio controls for debugging
+    remoteAudio.muted = false;
+    document.body.appendChild(remoteAudio);
+
+    // Enable the call button when the page is loaded
+    window.onload = function() {
+        callButton.disabled = false;
+    };
+
+
+
+    // Ensure pc is created before setting event handlers
+    if (!pc) {
+        pc = new RTCPeerConnection(configuration);
+    }
+
+    // Set the onicecandidate handler after initializing pc
+    pc.onicecandidate = ({ candidate }) => {
+        if (candidate) {
+            socket.emit('ice-candidate', candidate);
+        }
+    };
+
+    // Initialize the candidate queue
+    let candidateQueue = [];
+    let remoteDescriptionSet = false;
+
+
+    callButton.onclick = async function() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            pc = new RTCPeerConnection(configuration);
+            
+            pc.onicecandidate = ({ candidate }) => {
+                if (candidate) {
+                    console.log("ICE Candidate:", candidate);
+                    socket.emit('ice-candidate', candidate);
+                }
+            };
+            
+            // Receive incoming audio stream and visualize it
+            pc.ontrack = event => {
+                const [remoteStream] = event.streams;
+                remoteAudio.srcObject = remoteStream;
+                setupAudioVisualization(remoteStream);  // Start visualizing the incoming audio
+                console.log('Audio stream received from network user:', remoteStream);
+            };
+
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            
+            console.log("Sending offer:", offer);
+            socket.emit('offer', { offer: offer });
+
+            hangupButton.disabled = false;
+            callButton.disabled = true;
+            alert("Call started successfully.");
+
+        } catch (err) {
+            console.error('Error setting up call:', err);
+        }
+    };
+
+    hangupButton.onclick = function() {
+        stopAudioVisualization();  // Stop audio visualization
+
+        // Close the peer connection and stop all tracks in the local stream
+        if (pc) {
+            pc.close();
+            pc = null;
+        }
+
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());  // Stop all audio tracks in the local stream
+            localStream = null;
+        }
+
+        hangupButton.disabled = true;
+        callButton.disabled = true;
+
+        // Emit the hangup event to inform both users
+        socket.emit('hangup', { id: 'local_user', message: 'The call has been ended by the local user.' });
+    };
+
+
+
+
+
+
+    // Listen for broadcasted messages and append them with speaker_id
+    socket.on('broadcast_message', function(data) {
+        const messageContainer = document.getElementById('messageContainer');
+
+        if (!document.querySelector(`[data-id='${data.id}']`)) {
+            const newMessage = document.createElement('div');
+            newMessage.setAttribute('data-id', data.id);
+
+            // Display the speaker ID alongside the message
+            newMessage.innerHTML = `
+                <strong>${data.speaker_id}</strong>: ${data.name} (${data.major}): ${data.message}
+                <button onclick="deleteMessage(${data.id})">Delete</button>
+            `;
+
+            messageContainer.appendChild(newMessage);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+    });
+
+
+
+    function deleteMessage(id) {
+        socket.emit('delete_message', { id : id });
+    }
+
+    socket.on('delete_message', function(data) {
+        const messageElement = document.querySelector(`[data-id='${data.id}']`);
+        if (messageElement) {
+            messageElement.remove();
+        }
+    });
+
+
+
+
+
+
+
+
+
+    
+    socket.on('call_received', function(data){
+        console.log('Call_received');
+    });
+
+    socket.on('request_to_connect_ack', function(data) {
+        const messageContainer = document.getElementById('messageContainer');
+        const newMessage = document.createElement('div');
+        newMessage.classList.add('message-block');
+
+        newMessage.setAttribute('data-id', data.id);
+        
+        newMessage.innerHTML = `
+            <div style="display: flex; align-items: center;">
+                <div style="flex: 1;">
+                    <strong>${data.speaker_id}</strong> (${data.name}/${data.major}) has requested to connect.
+                </div>
+                <button class="btn btn-info" id="callButton-${data.name}" style="margin-left: 10px;">Call</button>
+                <button class="btn btn-dark" id="hangupButton-${data.name}" style="margin-left: 5px;" disabled>Hang Up</button>
+                <button class="btn btn-light" id="deleteButton-${data.name}" style="margin-left: 5px;">Delete</button>
+            </div>
+        `;
+
+        messageContainer.appendChild(newMessage);
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+
+        const deleteButton = document.getElementById(`deleteButton-${data.name}`);
+        deleteButton.onclick = function() {
+            newMessage.remove();
+            socket.emit('delete_speaking_request', { id: data.id });
+        };
+
+        setupCallHangupListeners(data.name);
+    });
+
+    function setupCallHangupListeners(name) {
+        const callButton = document.getElementById(`callButton-${name}`);
+        const hangupButton = document.getElementById(`hangupButton-${name}`);
+        const newMessage = callButton.parentElement.parentElement;
+
+        callButton.onclick = async function() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                pc = new RTCPeerConnection(configuration);
+
+                pc.onicecandidate = ({ candidate }) => {
+                    if (candidate) {
+                        socket.emit('ice-candidate', candidate);
+                    }
+                };
+
+                pc.ontrack = event => {
+                    const [remoteStream] = event.streams;
+                    remoteAudio.srcObject = remoteStream;  // Attach remote stream to the audio element
+                    remoteAudio.play();
+                    console.log("Received remote audio stream:", remoteStream);
+                    setupAudioVisualization(remoteStream);  // Start visualizing the incoming audio
+                };
+
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                socket.emit('offer', { offer: offer });
+                socket.emit('call_started', { message: 'A call has been started from the local user.' });
+
+                hangupButton.disabled = false;
+                callButton.disabled = true;
+            } catch (err) {
+                console.error('Error accessing audio:', err);
+            }
+        };
+
+        hangupButton.onclick = function() {
+            if (pc) {
+                pc.close();
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            hangupButton.disabled = true;
+            callButton.disabled = false;
+        };
+    }
+
+
+    // Listen for delete_speaking_request event to remove the specific message
+    socket.on('delete_speaking_request', function(data) {
+        const messageElement = document.querySelector(`[data-id='${data.id}']`);
+        if (messageElement) {
+            messageElement.remove();
+        }
+    });
+
+
+
+    // Visualize audio levels on the canvas
+    function setupAudioVisualization(stream) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        analyser.fftSize = 256;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        drawAudioLevel();
+    }
+
+    // Draw audio level bars
+    function drawAudioLevel() {
+        animationId = requestAnimationFrame(drawAudioLevel);
+        analyser.getByteFrequencyData(dataArray);
+        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / dataArray.length) * 2.5;
+        let x = 0;
+
+        dataArray.forEach(barHeight => {
+            // Scale the bar height based on the volume level
+            barHeight = (barHeight * volumeLevel) / 2;
+            canvasCtx.fillStyle = `rgb(${barHeight + 100}, 50, 150)`;
+            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+            x += barWidth + 1;
+        });
+    }
+
+    // document.getElementById('playAudioButton').onclick = function() {
+    //     remoteAudio.play();
+    // };
+
+    // Volume control
+    const volumeControl = document.getElementById('volumeControl');
+    let volumeLevel = parseFloat(volumeControl.value);
+
+    volumeControl.addEventListener('input', function() {
+        volumeLevel = parseFloat(this.value);
+        remoteAudio.volume = volumeLevel;  // Set the audio element's volume
+        console.log('Volume set to:', volumeLevel);
+    });
+
+    function stopAudioVisualization() {
+        cancelAnimationFrame(animationId);
+        if (audioContext) {
+            audioContext.close();
+        }
+    }
+
+    // Receive audio stream from network user
+    socket.on('receive_audio_stream', function(remoteStream) {
+        setupAudioVisualization(remoteStream);  // Visualize the remote audio stream
+    });
+
+    // Modify this to ensure the function is marked as async
+    socket.on('call_enabled', async function() {  // <-- 'async' added here
+        console.log("Received 'call_enabled' event");
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log("Audio tracks:", localStream.getAudioTracks());
+
+            setupAudioVisualization(localStream);
+
+            callButton.onclick = async function() {  // <-- 'async' added here
+                try {
+                    pc = new RTCPeerConnection(configuration);
+                    pc.onicecandidate = ({ candidate }) => {
+                        if (candidate) {
+                            console.log("Local ICE candidate generated:", candidate);
+                            socket.emit('ice-candidate', candidate);
+                        }
+                    };
+                    pc.ontrack = (event) => {
+                        const [remoteStream] = event.streams;
+                        remoteAudio.srcObject = remoteStream; // Set the remote stream to the audio element
+                        console.log("Remote audio stream received:", remoteStream);
+                        setupAudioVisualization(remoteStream); // Start visualizing the remote stream
+                    };
+
+                    // Ensure localStream is added to the peer connection
+                    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+
+                    socket.emit('offer', { offer: offer });
+
+                    hangupButton.disabled = false;
+                    callButton.disabled = true;
+
+                    alert("Call started successfully.");
+
+                } catch (err) {
+                    console.error('Error setting up call:', err);
+                }
+            };
+
+        } catch (err) {
+            console.error('Error accessing audio:', err);
+            alert("Unable to access your microphone. Please check permissions and try again.");
+        }
+    });
+
+    socket.on('hangup', function(data) {
+        console.log("Received 'hangup' event:", data);
+        stopAudioVisualization();  // Stop visualization on hangup
+
+        if (pc) {
+            pc.close();
+        }
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+
+        callButton.disabled = false;
+        hangupButton.disabled = true;
+        
+        alert(data.message || "The call has ended.");
+    });
+
+    socket.on('ice-candidate', (data) => {
+        const candidateInit = {
+            candidate: data.candidate,
+            sdpMid: data.sdpMid,
+            sdpMLineIndex: data.sdpMLineIndex,
+            usernameFragment: data.usernameFragment || 'default-ufrag'
+        };
+
+        const iceCandidate = new RTCIceCandidate(candidateInit);
+
+        if (remoteDescriptionSet) {
+            // Add candidate immediately if remote description is set
+            pc.addIceCandidate(iceCandidate).catch(error => console.error('Error adding ICE candidate:', error));
+        } else {
+            // Queue candidate until remote description is set
+            candidateQueue.push(iceCandidate);
+        }
+    });
+
+
+
+    pc.onicecandidate = ({ candidate }) => {
+        if (candidate) {
+            // Check if the candidate has the required fields
+            if (candidate.candidate && candidate.sdpMid !== null && candidate.sdpMLineIndex !== null) {
+                socket.emit('ice-candidate', { candidate });
+            } else {
+                console.warn('Invalid ICE candidate, skipping:', candidate);
+            }
+        }
+    };
+
+
+    socket.on('offer', async (data) => {
+        if (!pc) {
+            pc = new RTCPeerConnection(configuration);
+            
+            pc.onicecandidate = ({ candidate }) => {
+                if (candidate) socket.emit('ice-candidate', candidate);
+            };
+            
+            pc.ontrack = (event) => {
+                const [remoteStream] = event.streams;
+                remoteAudio.srcObject = remoteStream;
+                setupAudioVisualization(remoteStream);
+            };
+        }
+
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            remoteDescriptionSet = true;  // Set flag to true
+
+            // Process queued candidates
+            candidateQueue.forEach(candidate => pc.addIceCandidate(candidate));
+            candidateQueue = [];  // Clear the queue after processing
+
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit('answer', { answer });
+        } catch (error) {
+            console.error('Error handling received offer:', error);
+        }
+    });
+
+
+    // Ontrack Event
+    pc.ontrack = (event) => {
+        const [remoteStream] = event.streams;
+        remoteAudio.srcObject = remoteStream;
+        setupAudioVisualization(remoteStream);  // Start visualizing the audio
+    };
+
+
+</script>
+
+{% endblock %}

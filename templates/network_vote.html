@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Vote!{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Available Polls</h1>
+    <div id="pollsContainer" class="mt-4">
+        <p>Loading polls...</p>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // Function to load polls from the server
+    function loadPolls() {
+        $.get('/polls', function(response) {
+            if (response.success && response.polls.length > 0) {
+                const polls = response.polls;
+                let html = '';
+                polls.forEach(poll => {
+                    html += `
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5>${poll.question}</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="voteForm-${poll.id}">
+                                    ${poll.options.map(option => `
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="option_id" id="option${option.id}" value="${option.id}">
+                                            <label class="form-check-label" for="option${option.id}">
+                                                ${option.option_text}
+                                            </label>
+                                        </div>
+                                    `).join('')}
+                                    <button type="submit" class="btn btn-primary mt-3">Vote</button>
+                                </form>
+                            </div>
+                        </div>`;
+                });
+                $('#pollsContainer').html(html);
+
+                // Attach event listeners for voting
+                attachVoteEventListeners();
+            } else {
+                $('#pollsContainer').html('<p>No polls available. Create a new one!</p>');
+            }
+        }).fail(function() {
+            $('#pollsContainer').html('<p>Failed to load polls. Please try again later.</p>');
+        });
+    }
+
+    // Function to attach vote event listeners dynamically
+    function attachVoteEventListeners() {
+        $("form[id^='voteForm-']").submit(function(event) {
+            event.preventDefault();
+
+            const pollId = $(this).attr('id').split('-')[1];
+            const optionId = $(`#voteForm-${pollId} input[name='option_id']:checked`).val();
+
+            if (!optionId) {
+                alert("Please select an option before voting.");
+                return;
+            }
+
+            $.post(`/poll/${pollId}/vote`, { option_id: optionId })
+                .done(function(response) {
+                    alert(response.message);
+                    if (response.success) {
+                        loadPolls(); // Reload polls to reflect updated votes
+                    }
+                })
+                .fail(function() {
+                    alert("An error occurred while voting.");
+                });
+        });
+    }
+
+    // Load polls when the page is ready
+    $(document).ready(loadPolls);
+</script>
+<script>
+    // Check poll release status every 2 seconds
+    setInterval(() => {
+        fetch('/get_poll_state')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.released) {
+                    // Redirect to results page if poll is released
+                    window.location.href = "/polls/results";
+                }
+            })
+            .catch(error => console.error("Error checking poll state:", error));
+    }, 60000); // 60000 milliseconds = 60 seconds
+    // Load polls when the page is ready
+    $(document).ready(() => {
+        loadPolls();
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Poll Results{% endblock %}
+
+{% block page_content %}
+<h2 style="font-size:20px; color:gray;">
+    **This page shows the result from the polls. 
+    It interacts with active votes, so the server can know the result beforehand.**
+</h2>
+<br>
+<div class="container mt-4">
+    <div class="container">
+        <h1>Poll Results</h1>
+        <div id="pollResultsContainer" class="mt-4">
+            {% for poll in polls %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>{{ poll.question }}</h4>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-{{ poll.id }}" width="400" height="200"></canvas>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script src="/static/js/poll_results.js"></script>
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Parse the poll data from the server-rendered context
+    const pollData = JSON.parse('{{ polls|tojson|safe }}');
+
+    // Generate a bar chart for each poll
+    pollData.forEach(poll => {
+        const ctx = document.getElementById(`chart-${poll.id}`).getContext("2d");
+        const labels = poll.options.map(option => option.option_text);
+        const votes = poll.options.map(option => option.votes);
+
+        new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Votes",
+                    data: votes,
+                    backgroundColor: [
+                        "rgba(255, 99, 132, 0.2)",
+                        "rgba(54, 162, 235, 0.2)",
+                        "rgba(255, 206, 86, 0.2)",
+                        "rgba(75, 192, 192, 0.2)",
+                        "rgba(153, 102, 255, 0.2)",
+                        "rgba(255, 159, 64, 0.2)"
+                    ],
+                    borderColor: [
+                        "rgba(255, 99, 132, 1)",
+                        "rgba(54, 162, 235, 1)",
+                        "rgba(255, 206, 86, 1)",
+                        "rgba(75, 192, 192, 1)",
+                        "rgba(153, 102, 255, 1)",
+                        "rgba(255, 159, 64, 1)"
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: "Options"
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: "Votes"
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
