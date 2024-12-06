@@ -45,49 +45,10 @@ The Mic Drop project is structured into modular components:
 - Python 3.7+
 - Node.js and npm (for frontend dependencies)
 - Flask and Socket.IO packages
-- NGROK installation for https usage instead of http (securiity of using phone interfacess)
+- NGROK installation for HTTPS usage instead of HTTP (ensuring security when using phone interfaces)
 
-### Steps for running app
+### Steps for Running the App
 1. Clone the repository:
    ```bash
    git clone https://github.com/Parky10young/MicDrop.git
    cd MicDrop
-   
-2. Install dependencies:
-```bash
-  pip install -r requirements.txt
-  npm install
-  flask db upgrade
-  flask run
-or
-  python3 app.py
-
-
-### Local Users
-Create polls, manage text messages, and initiate audio calls from the dashboard.
-Access poll results dynamically as they update.
-Network Users
-Scan the QR code or visit the network interface.
-Participate in polls and engage in discussions.
-
-Challenges and Solutions
-Real-Time Synchronization:
-Solved using Socket.IO for consistent event propagation across clients.
-Media Management:
-Implemented WebRTC for robust audio streaming with permission handling.
-Scalability:
-Modular architecture and optimized database queries for performance.
-
-Future Enhancements
-Add video streaming alongside audio.
-Enhance UI/UX with animations and transitions.
-Implement user authentication for better session management.
-Develop advanced analytics for poll result visualization.
-
-Contributors
-Your Name - Developer and Maintainer
-Team Members - Contributors
-
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
-
