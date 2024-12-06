@@ -62,8 +62,8 @@ The Mic Drop project is structured into modular components:
 or
   python3 app.py
 
-Usage
-Local Users
+
+### Local Users
 Create polls, manage text messages, and initiate audio calls from the dashboard.
 Access poll results dynamically as they update.
 Network Users
