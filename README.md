@@ -80,6 +80,7 @@ The Mic Drop project is structured into modular components:
 type in:
 ```url
 localhost:5000/
+```
 
 ### Handle Message Container
 - Direct to the page by clicking "Talk with us" button in the Menu
